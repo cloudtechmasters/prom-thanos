@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service 
+metadata:
+  name: thanos-store
+  namespace: utilities
+  labels:
+    app.kubernetes.io/name: thanos-store
+spec:
+  type: LoadBalancer
+  ports:
+  - name: grpc
+    port: 10901
+    targetPort: 10901
+  - name: http
+    port: 10902
+    targetPort: 10902
+  selector:
+    app.kubernetes.io/name: thanos-store
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: thanos-store
+  namespace: utilities 
+  labels:
+    app: thanos-store
+    app.kubernetes.io/name: thanos-store
+spec:
+  serviceName: "thanos-store"
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos-store
+      app: thanos-store
+  template:
+    metadata:
+      labels:
+        app: thanos-store
+        app.kubernetes.io/name: thanos-store
+    spec:
+      containers:
+      - name: thanos-store
+        image: thanosio/thanos:v0.12.2
+        args:
+        - "store"
+        - "--log.level=debug"
+        - "--data-dir=/var/thanos/store"
+        - "--grpc-address=0.0.0.0:10901"
+        - "--http-address=0.0.0.0:10902"
+        - "--objstore.config-file=/config/thanos-store.yml"
+        livenessProbe:
+          failureThreshold: 8
+          httpGet:
+            path: /-/healthy
+            port: 10902
+            scheme: HTTP
+          periodSeconds: 30
+        ports:
+        - name: http
+          containerPort: 10902
+        - name: grpc
+          containerPort: 10901
+        volumeMounts:
+        - name: config
+          mountPath: /config/
+          readOnly: true
+        - name: data
+          mountPath: /var/thanos/store
+          readOnly: false
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: thanos-store-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thanos-store-config
+  namespace: utilities 
+data:
+  thanos-store.yml: |-
+    type: s3
+    config:
+      bucket: prom-thanos-store
+      endpoint: s3.us-east-2.amazonaws.com
+      access_key: "Your account Access Key"
+      secret_key: "Your account secret key"
+      encrypts: true
+      max_retries: 0

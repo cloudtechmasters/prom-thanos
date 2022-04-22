@@ -1,0 +1,7 @@
+type: s3
+config: 
+    bucket: prom-thanos-store
+    endpoint: s3.us-east-2.amazonaws.com
+    access_key: "Your Account Access Key"
+    secret_key: "Your Account Secret Key"
+    encrypts: true
